@@ -31,6 +31,9 @@ from app.core.personas import (  # noqa: E402
     PERSONAS,
     get_persona,
 )
+from app.core.chat import answer_query  # noqa: E402
+from app.core.quiz import evaluate_quiz, get_quiz_questions  # noqa: E402
+from app.models.requests import ChatRequest, QuizSubmitRequest  # noqa: E402
 from app.config import get_settings  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -189,12 +192,12 @@ from fastapi.responses import HTMLResponse, JSONResponse
 # ---------------------------------------------------------------------------
 # HTML Application Dashboard Template
 # ---------------------------------------------------------------------------
-INDEX_HTML = """<!DOCTYPE html>
+INDEX_HTML = r"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PlainClause — AI Legal Document Analyzer</title>
+  <title>PlainClause — Legal Document Analyzer, AI Chat & Awareness Quiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -215,20 +218,30 @@ INDEX_HTML = """<!DOCTYPE html>
     }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
     body { background-color: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; padding: 20px; }
-    header { max-width: 1200px; margin: 0 auto 30px; display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+    header { max-width: 1200px; margin: 0 auto 20px; display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
     .logo-container { display: flex; align-items: center; gap: 12px; }
-    .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary), var(--accent)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: white; }
+    .logo-icon { width: 42px; height: 42px; background: linear-gradient(135deg, var(--primary), var(--accent)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22px; color: white; }
     .logo-title { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #fff, var(--text-muted)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .nav-links a { color: var(--accent); text-decoration: none; font-size: 14px; font-weight: 600; padding: 8px 16px; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 20px; transition: all 0.2s; }
     .nav-links a:hover { background: rgba(6, 182, 212, 0.1); }
+    
+    /* Navigation Tabs */
+    .nav-tabs { max-width: 1200px; margin: 0 auto 25px; display: flex; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+    .tab-btn { padding: 10px 22px; border-radius: 8px; font-weight: 600; font-size: 15px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
+    .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+    .tab-btn.active { background: var(--primary); color: white; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+
+    .tab-view { display: none; }
+    .tab-view.active { display: block; }
+
     .container { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
     @media (max-width: 960px) { .container { grid-template-columns: 1fr; } }
     .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); }
     .card-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
     .form-group { margin-bottom: 20px; }
     label { display: block; font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
-    select, textarea, input[type="file"] { width: 100%; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: var(--text); font-size: 14px; transition: border-color 0.2s; }
-    select:focus, textarea:focus { border-color: var(--primary); outline: none; }
+    select, textarea, input[type="text"], input[type="file"] { width: 100%; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: var(--text); font-size: 14px; transition: border-color 0.2s; }
+    select:focus, textarea:focus, input[type="text"]:focus { border-color: var(--primary); outline: none; }
     textarea { height: 220px; resize: vertical; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
     .btn-group { display: flex; gap: 12px; }
     .btn { padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 15px; cursor: pointer; border: none; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
@@ -237,7 +250,7 @@ INDEX_HTML = """<!DOCTYPE html>
     .btn-secondary { background: #334155; color: var(--text); flex: 1; }
     .btn-secondary:hover { background: #475569; }
     
-    /* Analysis Results Styling */
+    /* Metrics & Clause Items */
     .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
     .metric-box { background: #0f172a; border-radius: 8px; padding: 14px; text-align: center; border: 1px solid var(--border); }
     .metric-val { font-size: 22px; font-weight: 800; color: var(--accent); }
@@ -261,6 +274,25 @@ INDEX_HTML = """<!DOCTYPE html>
     
     .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
     .empty-icon { font-size: 48px; margin-bottom: 12px; }
+
+    /* Chat Styling */
+    .chat-layout { max-width: 900px; margin: 0 auto; }
+    .chat-box { height: 420px; overflow-y: auto; padding: 20px; background: #0f172a; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 15px; display: flex; flex-direction: column; gap: 15px; }
+    .chat-msg { max-width: 80%; padding: 12px 16px; border-radius: 12px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+    .chat-msg.user { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
+    .chat-msg.bot { align-self: flex-start; background: #1e293b; color: var(--text); border: 1px solid var(--border); border-bottom-left-radius: 2px; }
+    .chips-container { margin-bottom: 15px; display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip { padding: 6px 14px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); color: #c7d2fe; border-radius: 20px; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+    .chip:hover { background: var(--primary); color: white; }
+
+    /* Quiz Styling */
+    .quiz-layout { max-width: 850px; margin: 0 auto; }
+    .quiz-question-card { background: #0f172a; border: 1px solid var(--border); border-radius: 10px; padding: 20px; margin-bottom: 20px; }
+    .quiz-q-title { font-size: 16px; font-weight: 700; margin-bottom: 12px; color: #fff; }
+    .quiz-category { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: var(--accent); margin-bottom: 6px; }
+    .option-card { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin: 8px 0; cursor: pointer; transition: all 0.2s; font-size: 14px; display: flex; align-items: center; gap: 10px; }
+    .option-card:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.1); }
+    .option-card.selected { border-color: var(--accent); background: rgba(6, 182, 212, 0.2); font-weight: 600; }
     
     .loading-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -272,83 +304,143 @@ INDEX_HTML = """<!DOCTYPE html>
       <div class="logo-icon">P</div>
       <div>
         <div class="logo-title">PlainClause</div>
-        <div style="font-size: 12px; color: var(--text-muted)">AI-Powered Legal Document Risk Analyzer</div>
+        <div style="font-size: 12px; color: var(--text-muted)">AI Legal Document Analyzer, Chat & Awareness Platform</div>
       </div>
     </div>
     <div class="nav-links">
-      <a href="/docs" target="_blank">⚡ API Documentation</a>
+      <a href="/docs" target="_blank">⚡ API Docs</a>
     </div>
   </header>
 
-  <main class="container">
-    <!-- Input Section -->
-    <section class="card">
-      <div class="card-title">
-        <span>📄 Document Analysis</span>
+  <!-- Nav Tabs -->
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('analyzer')">📄 Document Analyzer</button>
+    <button class="tab-btn" onclick="switchTab('chat')">💬 Legal AI Assistant</button>
+    <button class="tab-btn" onclick="switchTab('quiz')">🎯 Legal Awareness Quiz</button>
+  </div>
+
+  <!-- Tab 1: Document Analyzer -->
+  <div id="tab-analyzer" class="tab-view active">
+    <main class="container">
+      <section class="card">
+        <div class="card-title">
+          <span>📄 Document Analysis</span>
+        </div>
+        
+        <form id="analyzeForm">
+          <div class="form-group">
+            <label for="persona">Review Persona (Who is reviewing?)</label>
+            <select id="persona" name="persona">
+              <option value="tenant">Tenant or flatmate (Lease & Renting)</option>
+              <option value="employee">Employee or job applicant (Employment Contract)</option>
+              <option value="freelancer">Freelancer or small supplier (Client MSA & SOW)</option>
+              <option value="consumer">Consumer or app user (Terms of Service)</option>
+              <option value="founder">Founder or business partner (Shareholder / JV)</option>
+              <option value="buyer">Buyer or borrower (Loan & Purchase)</option>
+              <option value="other">General Reader (All-purpose review)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="docText">Paste Document Text</label>
+            <textarea id="docText" name="text" placeholder="Paste your lease, contract, or agreement text here..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="docFile">Or Upload File (.pdf or .txt)</label>
+            <input type="file" id="docFile" accept=".pdf,.txt">
+          </div>
+
+          <div class="btn-group">
+            <button type="submit" class="btn btn-primary" id="submitBtn">
+              <span>Analyze Document</span>
+            </button>
+            <button type="button" class="btn btn-secondary" id="sampleBtn">
+              <span>Load Sample</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <section class="card">
+        <div class="card-title">
+          <span>📊 Analysis Results</span>
+          <span id="riskBadge"></span>
+        </div>
+
+        <div id="resultsContent">
+          <div class="empty-state">
+            <div class="empty-icon">⚖️</div>
+            <h3>No Document Analyzed Yet</h3>
+            <p>Paste a document or click <strong>"Load Sample"</strong> then <strong>"Analyze Document"</strong> to generate a clause-by-clause risk report.</p>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Tab 2: Legal AI Assistant Chat -->
+  <div id="tab-chat" class="tab-view">
+    <div class="chat-layout">
+      <div class="card">
+        <div class="card-title">
+          <span>💬 Legal AI Assistant</span>
+          <span style="font-size: 12px; color: var(--text-muted);">Ask any question about clauses & contracts</span>
+        </div>
+
+        <div class="chips-container" id="chatChips">
+          <span class="chip" onclick="askPreset('What is a non-compete clause?')">What is a non-compete clause?</span>
+          <span class="chip" onclick="askPreset('How does a security deposit clause work?')">Deposit traps in leases</span>
+          <span class="chip" onclick="askPreset('What is indemnification?')">What is indemnification?</span>
+          <span class="chip" onclick="askPreset('What is mandatory arbitration?')">Mandatory arbitration</span>
+          <span class="chip" onclick="askPreset('What is IP assignment?')">IP Ownership / Side Projects</span>
+        </div>
+
+        <div class="chat-box" id="chatBox">
+          <div class="chat-msg bot">👋 Hello! I am your <strong>PlainClause Legal Assistant</strong>. Ask me anything about contract terms, clause red flags, tenant rights, or employment restrictive covenants!</div>
+        </div>
+
+        <form id="chatForm" style="display: flex; gap: 10px;">
+          <input type="text" id="chatInput" placeholder="Ask a question (e.g. What is indemnification?)..." required style="flex: 1;">
+          <button type="submit" class="btn btn-primary" style="flex: 0 0 auto; width: 120px;">Send</button>
+        </form>
       </div>
-      
-      <form id="analyzeForm">
-        <div class="form-group">
-          <label for="persona">Review Persona (Who is reviewing?)</label>
-          <select id="persona" name="persona">
-            <option value="tenant">Tenant or flatmate (Lease & Renting)</option>
-            <option value="employee">Employee or job applicant (Employment Contract)</option>
-            <option value="freelancer">Freelancer or small supplier (Client MSA & SOW)</option>
-            <option value="consumer">Consumer or app user (Terms of Service)</option>
-            <option value="founder">Founder or business partner (Shareholder / JV)</option>
-            <option value="buyer">Buyer or borrower (Loan & Purchase)</option>
-            <option value="other">General Reader (All-purpose review)</option>
-          </select>
+    </div>
+  </div>
+
+  <!-- Tab 3: Interactive Legal Awareness Quiz -->
+  <div id="tab-quiz" class="tab-view">
+    <div class="quiz-layout">
+      <div class="card">
+        <div class="card-title">
+          <span>🎯 Legal Awareness Quiz</span>
+          <span style="font-size: 13px; color: var(--accent);" id="quizStatus">Test your contract literacy</span>
         </div>
 
-        <div class="form-group">
-          <label for="docText">Paste Document Text</label>
-          <textarea id="docText" name="text" placeholder="Paste your lease, contract, or agreement text here..."></textarea>
-        </div>
-
-        <div class="form-group">
-          <label for="docFile">Or Upload File (.pdf or .txt)</label>
-          <input type="file" id="docFile" accept=".pdf,.txt">
-        </div>
-
-        <div class="btn-group">
-          <button type="submit" class="btn btn-primary" id="submitBtn">
-            <span>Analyze Document</span>
-          </button>
-          <button type="button" class="btn btn-secondary" id="sampleBtn">
-            <span>Load Sample</span>
-          </button>
-        </div>
-      </form>
-    </section>
-
-    <!-- Results Section -->
-    <section class="card">
-      <div class="card-title">
-        <span>📊 Analysis Results</span>
-        <span id="riskBadge"></span>
-      </div>
-
-      <div id="resultsContent">
-        <div class="empty-state">
-          <div class="empty-icon">⚖️</div>
-          <h3>No Document Analyzed Yet</h3>
-          <p>Paste a document or click <strong>"Load Sample"</strong> then <strong>"Analyze Document"</strong> to generate a clause-by-clause risk report.</p>
+        <div id="quizContent">
+          <div style="text-align: center; padding: 40px;">
+            <span class="loading-spinner"></span> Loading Quiz Questions...
+          </div>
         </div>
       </div>
-    </section>
-  </main>
+    </div>
+  </div>
 
   <script>
-    const sampleLease = `RESIDENTIAL LEASE AGREEMENT
+    // Tab Switcher
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+      
+      event.target.classList.add('active');
+      document.getElementById('tab-' + tabId).classList.add('active');
 
-1. SECURITY DEPOSIT: Tenant agrees to pay a security deposit of $3,000. Landlord reserves the right to retain the entire deposit if tenant terminates the lease early for any reason without exception.
-2. RENT INCREASE: Landlord may increase the monthly rent at any time upon 7 days written notice without limitation on the percentage increase.
-3. ENTRY RIGHTS: Landlord and agents may enter the premises at any time without prior notice for inspections, repairs, or showings.
-4. SUBLETTING: Subletting, assignment, or hosting guests for more than 2 consecutive nights is strictly prohibited and subject to immediate eviction.
-5. MAINTENANCE OBLIGATION: Tenant is solely responsible for all maintenance, repairs, and structural plumbing or roof fixes exceeding $50.
-6. LATE FEE: A late fee of $150 plus 10% daily interest will apply to any rent paid after the 1st of the month.`;
+      if (tabId === 'quiz' && !window.quizLoaded) {
+        loadQuiz();
+      }
+    }
 
+    // --- Document Analyzer Logic ---
     document.getElementById('sampleBtn').addEventListener('click', async () => {
       const persona = document.getElementById('persona').value;
       try {
@@ -473,6 +565,123 @@ INDEX_HTML = """<!DOCTYPE html>
         submitBtn.innerHTML = 'Analyze Document';
       }
     });
+
+    // --- Chat Agent Logic ---
+    function askPreset(qText) {
+      document.getElementById('chatInput').value = qText;
+      sendChatMessage();
+    }
+
+    async function sendChatMessage() {
+      const input = document.getElementById('chatInput');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      const chatBox = document.getElementById('chatBox');
+      chatBox.innerHTML += `<div class="chat-msg user">${msg}</div>`;
+      input.value = '';
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg })
+        });
+        const data = await res.json();
+        
+        let formattedReply = data.reply.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        chatBox.innerHTML += `<div class="chat-msg bot">${formattedReply}</div>`;
+        chatBox.scrollTop = chatBox.scrollHeight;
+      } catch (e) {
+        chatBox.innerHTML += `<div class="chat-msg bot" style="color: var(--danger)">Sorry, error processing query.</div>`;
+      }
+    }
+
+    document.getElementById('chatForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      sendChatMessage();
+    });
+
+    // --- Quiz Logic ---
+    let quizData = [];
+    let userAnswers = {};
+
+    async function loadQuiz() {
+      try {
+        const res = await fetch('/api/quiz');
+        const data = await res.json();
+        quizData = data.questions;
+        window.quizLoaded = true;
+
+        let quizHtml = quizData.map((q, idx) => `
+          <div class="quiz-question-card">
+            <div class="quiz-category">${q.category}</div>
+            <div class="quiz-q-title">Q${idx + 1}. ${q.question}</div>
+            <div>
+              ${q.options.map((opt, optIdx) => `
+                <div class="option-card" id="q_${q.id}_opt_${optIdx}" onclick="selectOption(${q.id}, ${optIdx})">
+                  <input type="radio" name="q_${q.id}" value="${optIdx}">
+                  <span>${opt}</span>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('');
+
+        quizHtml += `<button class="btn btn-primary" style="width: 100%; margin-top: 10px;" onclick="submitQuiz()">Submit Answers & View Score</button>`;
+        document.getElementById('quizContent').innerHTML = quizHtml;
+      } catch (err) {
+        document.getElementById('quizContent').innerHTML = `<p style="color: var(--danger)">Failed to load quiz questions.</p>`;
+      }
+    }
+
+    function selectOption(qid, optIdx) {
+      userAnswers[qid] = optIdx;
+      document.querySelectorAll(`[id^="q_${qid}_opt_"]`).forEach(el => el.classList.remove('selected'));
+      document.getElementById(`q_${qid}_opt_${optIdx}`).classList.add('selected');
+    }
+
+    async function submitQuiz() {
+      if (Object.keys(userAnswers).length < quizData.length) {
+        if (!confirm('You have unanswered questions. Submit anyway?')) return;
+      }
+
+      try {
+        const res = await fetch('/api/quiz/evaluate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers: userAnswers })
+        });
+        const data = await res.json();
+
+        let resultsHtml = `
+          <div style="text-align: center; padding: 20px; background: #0f172a; border-radius: 10px; margin-bottom: 25px; border: 1px solid var(--border);">
+            <div style="font-size: 32px; font-weight: 800; color: var(--accent); margin-bottom: 6px;">${data.score} / ${data.total} (${data.percentage}%)</div>
+            <div style="font-size: 20px; font-weight: 700; color: #fff;">${data.level}</div>
+          </div>
+          <h4 style="font-size: 16px; margin-bottom: 15px;">Detailed Breakdown & Explanations:</h4>
+        `;
+
+        resultsHtml += data.results.map((r, i) => `
+          <div class="quiz-question-card" style="border-left: 4px solid ${r.is_correct ? 'var(--success)' : 'var(--danger)'}">
+            <div style="font-weight: 700; margin-bottom: 6px;">Q${i+1}. ${r.question}</div>
+            <div style="font-size: 13px; margin-bottom: 8px;">
+              Result: <strong style="color: ${r.is_correct ? 'var(--success)' : 'var(--danger)'}">${r.is_correct ? 'Correct ✅' : 'Incorrect ❌'}</strong>
+            </div>
+            <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 6px; font-size: 13px; color: #cbd5e1;">
+              💡 <strong>Explanation:</strong> ${r.explanation}
+            </div>
+          </div>
+        `).join('');
+
+        resultsHtml += `<button class="btn btn-secondary" style="width: 100%; margin-top: 15px;" onclick="loadQuiz()">Retake Quiz</button>`;
+        document.getElementById('quizContent').innerHTML = resultsHtml;
+
+      } catch (err) {
+        alert('Error evaluating quiz: ' + err.message);
+      }
+    }
   </script>
 </body>
 </html>
@@ -506,6 +715,25 @@ async def get_sample(persona_id: str):
         with open(full_path, "r", encoding="utf-8") as f:
             return {"persona_id": persona_id, "filename": os.path.basename(rel_path), "text": f.read()}
     raise HTTPException(status_code=404, detail="Sample file not found")
+
+
+@app.post("/api/chat")
+async def chat_endpoint(req: ChatRequest):
+    """Legal assistant chat agent endpoint."""
+    return answer_query(req.message)
+
+
+@app.get("/api/quiz")
+async def quiz_questions_endpoint():
+    """Return interactive legal awareness quiz questions."""
+    return {"questions": get_quiz_questions()}
+
+
+@app.post("/api/quiz/evaluate")
+async def quiz_evaluate_endpoint(req: QuizSubmitRequest):
+    """Evaluate submitted quiz answers and return score & breakdown."""
+    return evaluate_quiz(req.answers)
+
 
 
 

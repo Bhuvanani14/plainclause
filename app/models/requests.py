@@ -109,3 +109,16 @@ class RedactionPreviewRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     text: str = Field(min_length=1, max_length=20000)
+
+
+class ChatRequest(BaseModel):
+    """Payload for the legal assistant chat agent."""
+
+    message: str = Field(default="", max_length=1000)
+
+
+class QuizSubmitRequest(BaseModel):
+    """Payload for submitting quiz responses."""
+
+    answers: dict[str, int] = Field(default_factory=dict)
+
