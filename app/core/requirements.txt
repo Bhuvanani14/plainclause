@@ -1,0 +1,25 @@
+# PlainClause Requirements
+
+## Core Dependencies
+
+Python >= 3.8
+
+## Optional Dependencies
+
+# For enhanced NLP capabilities (future)
+# spacy >= 3.0
+# transformers >= 4.0
+
+## Development Dependencies
+
+# Testing
+pytest >= 7.0
+pytest-cov >= 4.0
+
+# Code Quality
+black >= 23.0
+flake8 >= 6.0
+mypy >= 1.0
+
+# Documentation
+sphinx >= 5.0

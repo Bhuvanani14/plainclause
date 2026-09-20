@@ -1,0 +1,13 @@
+# PlainClause runtime dependencies.
+# Pinned to the exact versions the project is developed and tested against,
+# so Render builds are reproducible.
+fastapi==0.141.1
+uvicorn==0.53.0
+python-multipart==0.0.32
+pypdf==6.19.0
+pydantic>=2.0
+
+# Test tooling. Kept in this file on purpose: `pip install -r requirements.txt`
+# followed by `pytest` must work with no extra ceremony for reviewers.
+pytest==9.1.1
+httpx==0.28.1
