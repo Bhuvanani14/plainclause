@@ -33,7 +33,17 @@ from app.core.personas import (  # noqa: E402
 )
 from app.core.chat import answer_query  # noqa: E402
 from app.core.quiz import evaluate_quiz, get_quiz_questions  # noqa: E402
-from app.models.requests import ChatRequest, QuizSubmitRequest  # noqa: E402
+from app.core.auth import (  # noqa: E402
+    authenticate_user,
+    verify_session,
+    invalidate_session,
+    DEMO_USERS,
+)
+from app.models.requests import (  # noqa: E402
+    ChatRequest,
+    QuizSubmitRequest,
+    LoginRequest,
+)
 from app.config import get_settings  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -197,7 +207,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PlainClause — Legal Document Analyzer, AI Chat & Awareness Quiz</title>
+  <title>PlainClause — Secure Legal Document Analyzer, AI Chat & Quiz</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -222,9 +232,14 @@ INDEX_HTML = r"""<!DOCTYPE html>
     .logo-container { display: flex; align-items: center; gap: 12px; }
     .logo-icon { width: 42px; height: 42px; background: linear-gradient(135deg, var(--primary), var(--accent)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 22px; color: white; }
     .logo-title { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #fff, var(--text-muted)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .header-actions { display: flex; align-items: center; gap: 15px; }
     .nav-links a { color: var(--accent); text-decoration: none; font-size: 14px; font-weight: 600; padding: 8px 16px; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 20px; transition: all 0.2s; }
     .nav-links a:hover { background: rgba(6, 182, 212, 0.1); }
     
+    /* User Badge */
+    .user-badge { display: flex; align-items: center; gap: 10px; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.3); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; color: #c7d2fe; }
+    .user-role { font-size: 11px; padding: 2px 8px; background: var(--primary); color: white; border-radius: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+
     /* Navigation Tabs */
     .nav-tabs { max-width: 1200px; margin: 0 auto 25px; display: flex; gap: 12px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
     .tab-btn { padding: 10px 22px; border-radius: 8px; font-weight: 600; font-size: 15px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
@@ -240,8 +255,8 @@ INDEX_HTML = r"""<!DOCTYPE html>
     .card-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
     .form-group { margin-bottom: 20px; }
     label { display: block; font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
-    select, textarea, input[type="text"], input[type="file"] { width: 100%; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: var(--text); font-size: 14px; transition: border-color 0.2s; }
-    select:focus, textarea:focus, input[type="text"]:focus { border-color: var(--primary); outline: none; }
+    select, textarea, input[type="text"], input[type="password"], input[type="file"] { width: 100%; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: var(--text); font-size: 14px; transition: border-color 0.2s; }
+    select:focus, textarea:focus, input[type="text"]:focus, input[type="password"]:focus { border-color: var(--primary); outline: none; }
     textarea { height: 220px; resize: vertical; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
     .btn-group { display: flex; gap: 12px; }
     .btn { padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 15px; cursor: pointer; border: none; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
@@ -293,7 +308,13 @@ INDEX_HTML = r"""<!DOCTYPE html>
     .option-card { background: #1e293b; border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; margin: 8px 0; cursor: pointer; transition: all 0.2s; font-size: 14px; display: flex; align-items: center; gap: 10px; }
     .option-card:hover { border-color: var(--primary); background: rgba(99, 102, 241, 0.1); }
     .option-card.selected { border-color: var(--accent); background: rgba(6, 182, 212, 0.2); font-weight: 600; }
-    
+
+    /* Modal Overlay */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 9999; }
+    .modal-card { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 32px; width: 100%; max-width: 460px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); }
+    .demo-btn { width: 100%; text-align: left; padding: 10px 14px; margin-bottom: 8px; border-radius: 8px; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); color: #c7d2fe; font-size: 13px; cursor: pointer; transition: all 0.2s; display: flex; justify-content: space-between; align-items: center; }
+    .demo-btn:hover { background: var(--primary); color: white; }
+
     .loading-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 0.8s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
@@ -304,11 +325,16 @@ INDEX_HTML = r"""<!DOCTYPE html>
       <div class="logo-icon">P</div>
       <div>
         <div class="logo-title">PlainClause</div>
-        <div style="font-size: 12px; color: var(--text-muted)">AI Legal Document Analyzer, Chat & Awareness Platform</div>
+        <div style="font-size: 12px; color: var(--text-muted)">Secure AI Legal Document Analyzer, Chat & Awareness Platform</div>
       </div>
     </div>
-    <div class="nav-links">
-      <a href="/docs" target="_blank">⚡ API Docs</a>
+    <div class="header-actions">
+      <div class="nav-links">
+        <a href="/docs" target="_blank">⚡ API Docs</a>
+      </div>
+      <div id="userHeaderArea">
+        <button class="btn btn-secondary" onclick="openLoginModal()" style="font-size: 13px; padding: 8px 16px;">🔑 Sign In</button>
+      </div>
     </div>
   </header>
 
@@ -426,6 +452,45 @@ INDEX_HTML = r"""<!DOCTYPE html>
     </div>
   </div>
 
+  <!-- Security Login Modal Overlay -->
+  <div id="loginModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+        <h3 style="font-size: 20px; font-weight: 800;">🔒 PlainClause Login</h3>
+        <span style="font-size: 20px; cursor: pointer; color: var(--text-muted);" onclick="closeLoginModal()">✕</span>
+      </div>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+        Authentication required to save reviews & access AI legal assistant features.
+      </p>
+
+      <div style="margin-bottom: 20px;">
+        <label style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); margin-bottom: 8px;">1-Click Demo Logins:</label>
+        <div class="demo-btn" onclick="loginAsDemo('demo@plainclause.com', 'demo123Password!')">
+          <span>🚀 <strong>Alex Taylor</strong> (demo@plainclause.com)</span>
+          <span style="font-size: 11px; opacity: 0.8;">Premium User</span>
+        </div>
+        <div class="demo-btn" onclick="loginAsDemo('legal.admin', 'admin123Password!')">
+          <span>🛡️ <strong>Sarah Jenkins</strong> (legal.admin)</span>
+          <span style="font-size: 11px; opacity: 0.8;">Chief Legal Counsel</span>
+        </div>
+      </div>
+
+      <div style="text-align: center; font-size: 12px; color: var(--text-muted); margin-bottom: 16px;">— OR ENTER CREDENTIALS —</div>
+
+      <form id="loginForm">
+        <div class="form-group">
+          <label for="loginUser">Username or Email</label>
+          <input type="text" id="loginUser" placeholder="demo@plainclause.com" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPass">Password</label>
+          <input type="password" id="loginPass" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;" id="loginBtn">Sign In</button>
+      </form>
+    </div>
+  </div>
+
   <script>
     // Tab Switcher
     function switchTab(tabId) {
@@ -438,6 +503,94 @@ INDEX_HTML = r"""<!DOCTYPE html>
       if (tabId === 'quiz' && !window.quizLoaded) {
         loadQuiz();
       }
+    }
+
+    // --- Authentication Logic ---
+    let currentUser = null;
+
+    function checkAuth() {
+      const token = localStorage.getItem('pc_session_token');
+      const userRaw = localStorage.getItem('pc_user');
+      if (token && userRaw) {
+        try {
+          currentUser = JSON.parse(userRaw);
+          renderHeaderUser();
+          return;
+        } catch (e) {}
+      }
+      // Auto open login modal if no session
+      openLoginModal();
+    }
+
+    function renderHeaderUser() {
+      const area = document.getElementById('userHeaderArea');
+      if (currentUser) {
+        area.innerHTML = `
+          <div class="user-badge">
+            <span>👤 ${currentUser.name}</span>
+            <span class="user-role">${currentUser.role}</span>
+            <span style="cursor: pointer; margin-left: 8px; color: var(--danger);" onclick="logout()" title="Log Out">🚪 Exit</span>
+          </div>
+        `;
+      } else {
+        area.innerHTML = `<button class="btn btn-secondary" onclick="openLoginModal()" style="font-size: 13px; padding: 8px 16px;">🔑 Sign In</button>`;
+      }
+    }
+
+    function openLoginModal() {
+      document.getElementById('loginModal').style.display = 'flex';
+    }
+
+    function closeLoginModal() {
+      document.getElementById('loginModal').style.display = 'none';
+    }
+
+    async function loginAsDemo(user, pass) {
+      document.getElementById('loginUser').value = user;
+      document.getElementById('loginPass').value = pass;
+      await performLogin(user, pass);
+    }
+
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const user = document.getElementById('loginUser').value;
+      const pass = document.getElementById('loginPass').value;
+      await performLogin(user, pass);
+    });
+
+    async function performLogin(username, password) {
+      const btn = document.getElementById('loginBtn');
+      btn.disabled = true;
+      btn.innerHTML = `<span class="loading-spinner"></span> Signing In...`;
+
+      try {
+        const res = await fetch('/api/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Login failed');
+
+        localStorage.setItem('pc_session_token', data.session.token);
+        localStorage.setItem('pc_user', JSON.stringify(data.session));
+        currentUser = data.session;
+        renderHeaderUser();
+        closeLoginModal();
+      } catch (err) {
+        alert('Authentication Error: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Sign In';
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('pc_session_token');
+      localStorage.removeItem('pc_user');
+      currentUser = null;
+      renderHeaderUser();
+      openLoginModal();
     }
 
     // --- Document Analyzer Logic ---
@@ -682,6 +835,9 @@ INDEX_HTML = r"""<!DOCTYPE html>
         alert('Error evaluating quiz: ' + err.message);
       }
     }
+
+    // Initialize Auth state on load
+    window.addEventListener('DOMContentLoaded', checkAuth);
   </script>
 </body>
 </html>
@@ -695,6 +851,37 @@ INDEX_HTML = r"""<!DOCTYPE html>
 async def root():
     """Web application dashboard."""
     return HTMLResponse(content=INDEX_HTML)
+
+
+@app.post("/api/login")
+async def login_endpoint(req: LoginRequest):
+    """Authenticate user credentials."""
+    session = authenticate_user(req.username, req.password)
+    if not session:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials. Try demo credentials: demo@plainclause.com / demo123Password!",
+        )
+    return {"success": True, "session": session}
+
+
+@app.get("/api/auth/me")
+async def auth_me_endpoint(token: Optional[str] = None):
+    """Check active authentication status."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Missing session token")
+    session = verify_session(token)
+    if not session:
+        raise HTTPException(status_code=401, detail="Session expired or invalid")
+    return {"authenticated": True, "user": session}
+
+
+@app.post("/api/logout")
+async def logout_endpoint(token: Optional[str] = Form(None)):
+    """Log out and invalidate session."""
+    if token:
+        invalidate_session(token)
+    return {"success": True}
 
 
 @app.get("/api/samples/{persona_id}")
@@ -715,6 +902,7 @@ async def get_sample(persona_id: str):
         with open(full_path, "r", encoding="utf-8") as f:
             return {"persona_id": persona_id, "filename": os.path.basename(rel_path), "text": f.read()}
     raise HTTPException(status_code=404, detail="Sample file not found")
+
 
 
 @app.post("/api/chat")

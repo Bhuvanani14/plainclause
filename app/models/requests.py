@@ -122,3 +122,11 @@ class QuizSubmitRequest(BaseModel):
 
     answers: dict[str, int] = Field(default_factory=dict)
 
+
+class LoginRequest(BaseModel):
+    """Payload for user authentication login."""
+
+    username: str = Field(min_length=1, max_length=100)
+    password: str = Field(min_length=1, max_length=100)
+
+
