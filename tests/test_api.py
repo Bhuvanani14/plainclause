@@ -21,9 +21,8 @@ class TestHealthEndpoints:
     def test_root_returns_200(self):
         r = client.get("/")
         assert r.status_code == 200
-        body = r.json()
-        assert body["status"] == "running"
-        assert "PlainClause" in body["app"]
+        assert "PlainClause" in r.text
+        assert "Document Analysis" in r.text
 
     def test_health_returns_ok(self):
         r = client.get("/api/health")

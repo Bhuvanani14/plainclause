@@ -184,18 +184,288 @@ def _extract_text(filename: str, content: bytes) -> str:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
-@app.get("/")
-async def root():
-    """Welcome / health-check endpoint."""
-    return {
-        "app": settings.app_name,
-        "version": settings.version,
-        "status": "running",
-        "message": (
-            "PlainClause API is live. "
-            "POST /api/analyze with {text, persona} to analyse a document."
-        ),
+from fastapi.responses import HTMLResponse, JSONResponse
+
+# ---------------------------------------------------------------------------
+# HTML Application Dashboard Template
+# ---------------------------------------------------------------------------
+INDEX_HTML = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PlainClause — AI Legal Document Analyzer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --accent: #06b6d4;
+      --danger: #ef4444;
+      --warning: #f59e0b;
+      --success: #10b981;
+      --radius: 12px;
     }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Inter', sans-serif; }
+    body { background-color: var(--bg); color: var(--text); line-height: 1.6; min-height: 100vh; padding: 20px; }
+    header { max-width: 1200px; margin: 0 auto 30px; display: flex; justify-content: space-between; align-items: center; padding-bottom: 20px; border-bottom: 1px solid var(--border); }
+    .logo-container { display: flex; align-items: center; gap: 12px; }
+    .logo-icon { width: 40px; height: 40px; background: linear-gradient(135deg, var(--primary), var(--accent)); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; color: white; }
+    .logo-title { font-size: 24px; font-weight: 800; background: linear-gradient(135deg, #fff, var(--text-muted)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .nav-links a { color: var(--accent); text-decoration: none; font-size: 14px; font-weight: 600; padding: 8px 16px; border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 20px; transition: all 0.2s; }
+    .nav-links a:hover { background: rgba(6, 182, 212, 0.1); }
+    .container { max-width: 1200px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+    @media (max-width: 960px) { .container { grid-template-columns: 1fr; } }
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.3); }
+    .card-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+    .form-group { margin-bottom: 20px; }
+    label { display: block; font-size: 14px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; }
+    select, textarea, input[type="file"] { width: 100%; background: #0f172a; border: 1px solid var(--border); border-radius: 8px; padding: 12px; color: var(--text); font-size: 14px; transition: border-color 0.2s; }
+    select:focus, textarea:focus { border-color: var(--primary); outline: none; }
+    textarea { height: 220px; resize: vertical; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+    .btn-group { display: flex; gap: 12px; }
+    .btn { padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 15px; cursor: pointer; border: none; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-primary { background: var(--primary); color: white; flex: 2; }
+    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-secondary { background: #334155; color: var(--text); flex: 1; }
+    .btn-secondary:hover { background: #475569; }
+    
+    /* Analysis Results Styling */
+    .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+    .metric-box { background: #0f172a; border-radius: 8px; padding: 14px; text-align: center; border: 1px solid var(--border); }
+    .metric-val { font-size: 22px; font-weight: 800; color: var(--accent); }
+    .metric-lbl { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+    
+    .badge-risk { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 700; text-transform: uppercase; }
+    .risk-High { background: rgba(239, 68, 68, 0.2); color: var(--danger); border: 1px solid var(--danger); }
+    .risk-Moderate { background: rgba(245, 158, 11, 0.2); color: var(--warning); border: 1px solid var(--warning); }
+    .risk-Low { background: rgba(16, 185, 129, 0.2); color: var(--success); border: 1px solid var(--success); }
+
+    .clause-item { background: #0f172a; border-left: 4px solid var(--border); border-radius: 6px; padding: 16px; margin-bottom: 14px; border-top: 1px solid rgba(255,255,255,0.05); }
+    .clause-item.sev-high { border-left-color: var(--danger); }
+    .clause-item.sev-med { border-left-color: var(--warning); }
+    .clause-item.sev-low { border-left-color: var(--success); }
+    
+    .clause-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .clause-title { font-weight: 700; font-size: 15px; color: #fff; }
+    .clause-line { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); background: #1e293b; padding: 2px 6px; border-radius: 4px; }
+    .clause-why { font-size: 13px; color: var(--text-muted); margin-bottom: 8px; }
+    .clause-tip { background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); border-radius: 6px; padding: 10px; font-size: 13px; color: #c7d2fe; margin-top: 8px; }
+    
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    
+    .loading-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-container">
+      <div class="logo-icon">P</div>
+      <div>
+        <div class="logo-title">PlainClause</div>
+        <div style="font-size: 12px; color: var(--text-muted)">AI-Powered Legal Document Risk Analyzer</div>
+      </div>
+    </div>
+    <div class="nav-links">
+      <a href="/docs" target="_blank">⚡ API Documentation</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Input Section -->
+    <section class="card">
+      <div class="card-title">
+        <span>📄 Document Analysis</span>
+      </div>
+      
+      <form id="analyzeForm">
+        <div class="form-group">
+          <label for="persona">Review Persona (Who is reviewing?)</label>
+          <select id="persona" name="persona">
+            <option value="tenant">Tenant or flatmate (Lease & Renting)</option>
+            <option value="employee">Employee or job applicant (Employment Contract)</option>
+            <option value="freelancer">Freelancer or small supplier (Client MSA & SOW)</option>
+            <option value="consumer">Consumer or app user (Terms of Service)</option>
+            <option value="founder">Founder or business partner (Shareholder / JV)</option>
+            <option value="buyer">Buyer or borrower (Loan & Purchase)</option>
+            <option value="other">General Reader (All-purpose review)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="docText">Paste Document Text</label>
+          <textarea id="docText" name="text" placeholder="Paste your lease, contract, or agreement text here..."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="docFile">Or Upload File (.pdf or .txt)</label>
+          <input type="file" id="docFile" accept=".pdf,.txt">
+        </div>
+
+        <div class="btn-group">
+          <button type="submit" class="btn btn-primary" id="submitBtn">
+            <span>Analyze Document</span>
+          </button>
+          <button type="button" class="btn btn-secondary" id="sampleBtn">
+            <span>Load Sample</span>
+          </button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Results Section -->
+    <section class="card">
+      <div class="card-title">
+        <span>📊 Analysis Results</span>
+        <span id="riskBadge"></span>
+      </div>
+
+      <div id="resultsContent">
+        <div class="empty-state">
+          <div class="empty-icon">⚖️</div>
+          <h3>No Document Analyzed Yet</h3>
+          <p>Paste a document or click <strong>"Load Sample"</strong> then <strong>"Analyze Document"</strong> to generate a clause-by-clause risk report.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const sampleLease = `RESIDENTIAL LEASE AGREEMENT
+
+1. SECURITY DEPOSIT: Tenant agrees to pay a security deposit of $3,000. Landlord reserves the right to retain the entire deposit if tenant terminates the lease early for any reason without exception.
+2. RENT INCREASE: Landlord may increase the monthly rent at any time upon 7 days written notice without limitation on the percentage increase.
+3. ENTRY RIGHTS: Landlord and agents may enter the premises at any time without prior notice for inspections, repairs, or showings.
+4. SUBLETTING: Subletting, assignment, or hosting guests for more than 2 consecutive nights is strictly prohibited and subject to immediate eviction.
+5. MAINTENANCE OBLIGATION: Tenant is solely responsible for all maintenance, repairs, and structural plumbing or roof fixes exceeding $50.
+6. LATE FEE: A late fee of $150 plus 10% daily interest will apply to any rent paid after the 1st of the month.`;
+
+    document.getElementById('sampleBtn').addEventListener('click', () => {
+      document.getElementById('docText').value = sampleLease;
+      document.getElementById('persona').value = 'tenant';
+    });
+
+    document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const submitBtn = document.getElementById('submitBtn');
+      const resultsDiv = document.getElementById('resultsContent');
+      const riskBadge = document.getElementById('riskBadge');
+      
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span class="loading-spinner"></span> Analyzing...`;
+
+      try {
+        const formData = new FormData();
+        const persona = document.getElementById('persona').value;
+        const fileInput = document.getElementById('docFile');
+        const textInput = document.getElementById('docText').value;
+
+        let endpoint = '/api/analyze';
+
+        if (fileInput.files.length > 0) {
+          endpoint = '/api/analyze/upload';
+          formData.append('file', fileInput.files[0]);
+          formData.append('persona', persona);
+        } else {
+          if (!textInput.trim() || textInput.trim().length < 30) {
+            alert('Please paste a document with at least 30 characters.');
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = 'Analyze Document';
+            return;
+          }
+          formData.append('text', textInput);
+          formData.append('persona', persona);
+        }
+
+        const res = await fetch(endpoint, { method: 'POST', body: formData });
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.detail || 'Analysis failed');
+        }
+
+        // Render Results
+        riskBadge.className = `badge-risk risk-${data.risk_level}`;
+        riskBadge.innerText = `${data.risk_level} Risk`;
+
+        const highCount = data.clauses.filter(c => c.weighted_severity >= 7).length;
+
+        let clausesHtml = data.clauses.map(c => {
+          const sevClass = c.weighted_severity >= 7 ? 'sev-high' : (c.weighted_severity >= 4 ? 'sev-med' : 'sev-low');
+          return `
+            <div class="clause-item ${sevClass}">
+              <div class="clause-header">
+                <span class="clause-title">${c.clause_label}</span>
+                <span class="clause-line">Line ${c.line_number} • Severity ${c.weighted_severity}/10</span>
+              </div>
+              <div style="font-size: 13px; color: #cbd5e1; margin-bottom: 6px;"><em>"${c.line_text}"</em></div>
+              <div class="clause-why"><strong>Why it matters:</strong> ${c.why_it_matters}</div>
+              ${c.negotiation_tip ? `<div class="clause-tip">💡 <strong>Negotiation Tip:</strong> ${c.negotiation_tip}</div>` : ''}
+            </div>
+          `;
+        }).join('');
+
+        let questionsHtml = (data.questions_to_ask || []).map(q => `<li>${q}</li>`).join('');
+
+        resultsDiv.innerHTML = `
+          <div class="metrics-grid">
+            <div class="metric-box">
+              <div class="metric-val">${data.total_clauses_found}</div>
+              <div class="metric-lbl">Clauses Detected</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val">${data.average_severity}</div>
+              <div class="metric-lbl">Avg Severity</div>
+            </div>
+            <div class="metric-box">
+              <div class="metric-val" style="color: var(--danger)">${highCount}</div>
+              <div class="metric-lbl">High Risk Items</div>
+            </div>
+          </div>
+
+          <div style="margin-bottom: 20px;">
+            <h4 style="font-size: 14px; margin-bottom: 8px; color: var(--accent);">Key Questions to Ask:</h4>
+            <ul style="padding-left: 20px; font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
+              ${questionsHtml}
+            </ul>
+          </div>
+
+          <h4 style="font-size: 15px; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+            Detected Clause Breakdown
+          </h4>
+          <div>${clausesHtml || '<p style="color: var(--text-muted)">No high-risk clauses matching pattern rules were detected.</p>'}</div>
+        `;
+
+      } catch (err) {
+        alert('Error: ' + err.message);
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = 'Analyze Document';
+      }
+    });
+  </script>
+</body>
+</html>
+"""
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+@app.get("/", response_class=HTMLResponse)
+async def root():
+    """Web application dashboard."""
+    return HTMLResponse(content=INDEX_HTML)
+
 
 
 @app.get("/api/health")
