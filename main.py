@@ -349,9 +349,30 @@ INDEX_HTML = """<!DOCTYPE html>
 5. MAINTENANCE OBLIGATION: Tenant is solely responsible for all maintenance, repairs, and structural plumbing or roof fixes exceeding $50.
 6. LATE FEE: A late fee of $150 plus 10% daily interest will apply to any rent paid after the 1st of the month.`;
 
-    document.getElementById('sampleBtn').addEventListener('click', () => {
-      document.getElementById('docText').value = sampleLease;
-      document.getElementById('persona').value = 'tenant';
+    document.getElementById('sampleBtn').addEventListener('click', async () => {
+      const persona = document.getElementById('persona').value;
+      try {
+        const res = await fetch(`/api/samples/${persona}`);
+        const data = await res.json();
+        if (data.text) {
+          document.getElementById('docText').value = data.text;
+        }
+      } catch (e) {
+        console.error('Failed to load sample', e);
+      }
+    });
+
+    document.getElementById('persona').addEventListener('change', async (e) => {
+      const persona = e.target.value;
+      if (!document.getElementById('docText').value.trim()) {
+        try {
+          const res = await fetch(`/api/samples/${persona}`);
+          const data = await res.json();
+          if (data.text) {
+            document.getElementById('docText').value = data.text;
+          }
+        } catch (err) {}
+      }
     });
 
     document.getElementById('analyzeForm').addEventListener('submit', async (e) => {
@@ -465,6 +486,27 @@ INDEX_HTML = """<!DOCTYPE html>
 async def root():
     """Web application dashboard."""
     return HTMLResponse(content=INDEX_HTML)
+
+
+@app.get("/api/samples/{persona_id}")
+async def get_sample(persona_id: str):
+    """Serve sample review documents for each persona option."""
+    file_map = {
+        "tenant": "samples/sample_tenant_lease.txt",
+        "employee": "samples/sample_employee_contract.txt",
+        "freelancer": "samples/sample_freelancer_msa.txt",
+        "consumer": "samples/sample_consumer_tos.txt",
+        "founder": "samples/sample_founder_partnership.txt",
+        "buyer": "samples/sample_buyer_loan.txt",
+        "other": "samples/sample_general_contract.txt",
+    }
+    rel_path = file_map.get(persona_id, "samples/sample_general_contract.txt")
+    full_path = os.path.join(_PROJECT_ROOT, rel_path)
+    if os.path.exists(full_path):
+        with open(full_path, "r", encoding="utf-8") as f:
+            return {"persona_id": persona_id, "filename": os.path.basename(rel_path), "text": f.read()}
+    raise HTTPException(status_code=404, detail="Sample file not found")
+
 
 
 

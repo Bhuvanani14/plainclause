@@ -1,0 +1,16 @@
+GENERAL COMMERCIAL AND COOPERATION AGREEMENT
+
+1. LIMITATION OF LIABILITY
+Neither Party's aggregate total financial liability for any breach, negligence, or statutory claim arising under or in connection with this Agreement shall exceed the total fees paid under this Agreement in the preceding 3 months.
+
+2. UNILATERAL TERMINATION AND EXIT
+Either Party may terminate this Agreement at any time for convenience by providing 30 days written notice to the other Party. Upon termination, all rights and licenses granted shall immediately cease.
+
+3. GOVERNING LAW AND JURISDICTION
+This Agreement shall be governed by, construed, and enforced in accordance with the laws of the State of New York, without giving effect to conflicts of law principles. Courts of New York City shall have exclusive jurisdiction.
+
+4. CONFIDENTIALITY AND NON-DISCLOSURE
+Each Party agrees to hold in confidence all proprietary information, software source code, customer lists, and financial figures disclosed by the disclosing party, and shall not disclose such information to any third party for 5 years.
+
+5. AMENDMENTS AND ENTIRE AGREEMENT
+This Agreement constitutes the entire understanding between the parties with respect to the subject matter hereof. No amendment, modification, or waiver of any provision shall be effective unless embodied in writing signed by authorized representatives of both Parties.

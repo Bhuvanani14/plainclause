@@ -1,0 +1,19 @@
+MASTER SERVICES AGREEMENT (FREELANCER / SUPPLIER)
+
+1. PAYMENT TERMS AND INVOICING
+Client shall pay valid invoices within 120 days of receipt (Net 120). No interest, late payment charges, or statutory recovery costs shall accrue on late payments under any circumstances.
+
+2. TERMINATION FOR CONVENIENCE
+Client may terminate this Agreement or any Statement of Work immediately at any time for convenience without cause. Upon termination, Client shall have no obligation to pay Contractor for work performed prior to termination that has not been formally approved in writing.
+
+3. UNLIMITED INDEMNIFICATION
+Contractor shall fully indemnify, defend, and hold harmless Client, its affiliates, officers, and clients from and against any and all claims, damages, liabilities, losses, costs, and attorney fees arising out of performance of services under this Agreement.
+
+4. LIMITATION OF LIABILITY
+Contractor's liability under this Agreement shall be unlimited. Client's aggregate liability under this Agreement for any and all claims shall be capped at $100.
+
+5. INTELLECTUAL PROPERTY AND WORK FOR HIRE
+All deliverables, work product, inventions, code, and trade secrets developed under this Agreement shall belong exclusively to Client from creation. Contractor grants Client a perpetual, irrevocable, royalty-free, worldwide license to use Contractor's pre-existing IP.
+
+6. EXCLUSIVITY AND NON-COMPETE
+Contractor shall not perform services of any kind for any entity operating in the same industry as Client during the term of this Agreement and for 12 months thereafter.

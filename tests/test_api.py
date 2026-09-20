@@ -110,3 +110,20 @@ class TestUpload:
         )
         assert r.status_code == 200
         assert r.json()["total_clauses_found"] >= 1
+
+
+# ---------------------------------------------------------------------------
+# Samples
+# ---------------------------------------------------------------------------
+class TestSamples:
+    @pytest.mark.parametrize(
+        "persona_id",
+        ["tenant", "employee", "freelancer", "consumer", "founder", "buyer", "other"],
+    )
+    def test_get_sample_document(self, persona_id):
+        r = client.get(f"/api/samples/{persona_id}")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["persona_id"] == persona_id
+        assert len(data["text"]) > 100
+

@@ -1,0 +1,16 @@
+SHAREHOLDERS AND PARTNERSHIP AGREEMENT
+
+1. IP ASSIGNMENT TO COMPANY AND FORFEITURE
+Founder irrevocably assigns all present and future intellectual property, inventions, domain names, patents, and software repositories created by Founder to the Company. In the event of Founder departure, all assigned IP remains the exclusive property of Company without compensation.
+
+2. UNILATERAL AMENDMENT OF SHARE RIGHTS
+Investor and Majority Shareholder reserve the unilateral right to amend, alter, or dilute share classes, voting rights, veto rights, and liquidation preferences without obtaining consent from Founder or minority shareholders.
+
+3. FORCED DRAG-ALONG AND EXIT VALUATION
+If Shareholders holding 51% of voting equity approve a sale or acquisition of the Company, Founder agrees to sell all shares on the same terms, regardless of valuation or whether Founder considers the sale price adequate.
+
+4. NON-COMPETE AND EXCLUSIVITY
+Founder shall devote 100% of full-time business efforts exclusively to Company. Founder shall not engage in, invest in, or assist any other enterprise during tenure and for 24 months following cessation of involvement.
+
+5. FORFEITURE UPON TERMINATION FOR CAUSE
+If Founder's involvement is terminated for cause or breach as determined by the Board, all unvested and vested equity shares held by Founder shall be automatically forfeited and cancelled for nominal consideration ($0.01 per share).
